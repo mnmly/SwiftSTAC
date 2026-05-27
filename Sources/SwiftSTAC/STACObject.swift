@@ -14,7 +14,7 @@ open class STACObject: @unchecked Sendable {
 
     /// Short human-readable form used by ``Catalog/describe(includeHrefs:indent:output:)``
     /// and debugging tools. Mirrors `pystac`'s `__repr__`. Not named
-    /// ``description`` to avoid clashing with the STAC `description` field on
+    /// `description` to avoid clashing with the STAC `description` field on
     /// Catalog/Collection.
     open var repr: String {
         "<\(String(describing: type(of: self))) id=\(id)>"

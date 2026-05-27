@@ -5,7 +5,7 @@ import Foundation
 ///
 /// Mirrors `pystac.asset.Asset`. The owning Item/Collection back-reference is
 /// modeled via the ``owner`` weak reference — set automatically by
-/// ``Assets.addAsset(key:asset:)`` / Item / Collection construction.
+/// ``AssetOwner/addAsset(key:asset:)`` / Item / Collection construction.
 public final class Asset: @unchecked Sendable {
 
     /// Link to the asset object. Relative and absolute hrefs are both allowed.

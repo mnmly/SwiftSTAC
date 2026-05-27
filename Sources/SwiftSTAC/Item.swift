@@ -37,7 +37,7 @@ public final class Item: STACObject, AssetOwner, @unchecked Sendable {
 
     /// Designated initializer. `datetime` may be `nil` only when both
     /// `start_datetime` and `end_datetime` are present in `properties` (or
-    /// supplied here). Throws ``STACError/generic`` otherwise.
+    /// supplied here). Throws ``STACError/generic(_:)`` otherwise.
     public init(
         id: String,
         geometry: JSONValue?,
