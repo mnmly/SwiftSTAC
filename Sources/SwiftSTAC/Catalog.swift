@@ -6,7 +6,7 @@ import Foundation
 /// links. In-memory tree operations (`addChild`, `getItems`, etc.) work on
 /// links whose targets are already resolved STAC objects — filesystem
 /// resolution lives in a later phase along with `StacIO`.
-open class Catalog: STACObject, @unchecked Sendable {
+open class Catalog: STACObject {
 
     public var description: String
     public var title: String?

@@ -5,8 +5,8 @@ extension STACObject {
     public func saveObject(
         includeSelfLink: Bool = true,
         destHref: String? = nil,
-        stacIO: StacIO = StacIORegistry.currentDefault()
-    ) throws {
+        stacIO: any StacIO = DefaultStacIO()
+    ) async throws {
         let dest: String
         if let destHref {
             dest = destHref
@@ -26,7 +26,7 @@ extension STACObject {
         default:
             throw STACError.generic("Cannot serialize unknown STACObject subclass: \(type(of: self))")
         }
-        try stacIO.saveJSON(dict, to: dest)
+        try await stacIO.saveJSON(dict, to: dest)
     }
 }
 
@@ -35,10 +35,10 @@ extension Catalog {
     /// depending on the document's `type`. Sets the self href to `href`.
     public static func fromFile(
         _ href: String,
-        stacIO: StacIO = StacIORegistry.currentDefault()
-    ) throws -> STACObject {
+        stacIO: any StacIO = DefaultStacIO()
+    ) async throws -> STACObject {
         let absolute = HREFUtils.isAbsolute(href) ? href : HREFUtils.makeAbsolute(href)
-        return try stacIO.readSTACObject(absolute)
+        return try await stacIO.readSTACObject(absolute)
     }
 }
 
@@ -46,10 +46,10 @@ extension Item {
     /// Load an Item at `href`.
     public static func fromFile(
         _ href: String,
-        stacIO: StacIO = StacIORegistry.currentDefault()
-    ) throws -> Item {
+        stacIO: any StacIO = DefaultStacIO()
+    ) async throws -> Item {
         let abs = HREFUtils.isAbsolute(href) ? href : HREFUtils.makeAbsolute(href)
-        let obj = try stacIO.readSTACObject(abs)
+        let obj = try await stacIO.readSTACObject(abs)
         guard let item = obj as? Item else {
             throw STACError.typeMismatch(id: obj.id, expected: "Item", extra: nil)
         }
@@ -61,10 +61,10 @@ extension Collection {
     /// Load a Collection at `href`.
     public static func fromCollectionFile(
         _ href: String,
-        stacIO: StacIO = StacIORegistry.currentDefault()
-    ) throws -> Collection {
+        stacIO: any StacIO = DefaultStacIO()
+    ) async throws -> Collection {
         let abs = HREFUtils.isAbsolute(href) ? href : HREFUtils.makeAbsolute(href)
-        let obj = try stacIO.readSTACObject(abs)
+        let obj = try await stacIO.readSTACObject(abs)
         guard let coll = obj as? Collection else {
             throw STACError.typeMismatch(id: obj.id, expected: "Collection", extra: nil)
         }
@@ -74,13 +74,12 @@ extension Collection {
 
 extension Link {
     /// Resolve this link's target to a concrete STACObject, mirroring
-    /// `pystac.Link.resolve_stac_object`. Reads the linked document via
-    /// `stacIO` (or the registered default) and caches the result on this link.
+    /// `pystac.Link.resolve_stac_object`.
     @discardableResult
     public func resolveSTACObject(
         root: Catalog? = nil,
-        stacIO: StacIO? = nil
-    ) throws -> STACObject {
+        stacIO: (any StacIO)? = nil
+    ) async throws -> STACObject {
         if case let .object(o) = try? getTarget() { return o }
         guard let href = getTargetString() else {
             throw STACError.generic("Cannot resolve STAC object without a target.")
@@ -95,10 +94,10 @@ extension Link {
         } else {
             throw STACError.generic("Relative href '\(href)' encountered without owner or root.")
         }
-        let io = stacIO ?? StacIORegistry.currentDefault()
+        let io = stacIO ?? DefaultStacIO()
         let obj: STACObject
         do {
-            obj = try io.readSTACObject(resolvedHref, root: root)
+            obj = try await io.readSTACObject(resolvedHref, root: root)
         } catch {
             throw STACError.generic("HREF: '\(resolvedHref)' does not resolve to a STAC object")
         }
@@ -113,14 +112,14 @@ extension Catalog {
     /// Walk the catalog tree, resolving child & item links via `stacIO` as we
     /// go. Returns `(catalog, children, items)` tuples like ``walk()``.
     public func walkResolving(
-        stacIO: StacIO = StacIORegistry.currentDefault()
-    ) throws -> [(catalog: Catalog, children: [STACObject], items: [Item])] {
+        stacIO: any StacIO = DefaultStacIO()
+    ) async throws -> [(catalog: Catalog, children: [STACObject], items: [Item])] {
         var out: [(Catalog, [STACObject], [Item])] = []
-        let resolved = try resolveChildrenAndItems(stacIO: stacIO)
+        let resolved = try await resolveChildrenAndItems(stacIO: stacIO)
         out.append((self, resolved.children, resolved.items))
         for child in resolved.children {
             if let cat = child as? Catalog {
-                out.append(contentsOf: try cat.walkResolving(stacIO: stacIO))
+                out.append(contentsOf: try await cat.walkResolving(stacIO: stacIO))
             }
         }
         return out
@@ -129,17 +128,17 @@ extension Catalog {
     /// Resolve every child and item link on this catalog (single level).
     @discardableResult
     public func resolveChildrenAndItems(
-        stacIO: StacIO = StacIORegistry.currentDefault()
-    ) throws -> (children: [STACObject], items: [Item]) {
+        stacIO: any StacIO = DefaultStacIO()
+    ) async throws -> (children: [STACObject], items: [Item]) {
         var children: [STACObject] = []
         var items: [Item] = []
         let root = getRoot() as? Catalog
         for link in getLinks(rel: .child) {
-            let obj = try link.resolveSTACObject(root: root, stacIO: stacIO)
+            let obj = try await link.resolveSTACObject(root: root, stacIO: stacIO)
             children.append(obj)
         }
         for link in getLinks(rel: .item) {
-            let obj = try link.resolveSTACObject(root: root, stacIO: stacIO)
+            let obj = try await link.resolveSTACObject(root: root, stacIO: stacIO)
             if let item = obj as? Item { items.append(item) }
         }
         return (children, items)

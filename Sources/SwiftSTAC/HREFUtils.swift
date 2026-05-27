@@ -300,32 +300,52 @@ public enum HREFUtils {
     /// Convert a `Date` to an RFC 3339 string with millisecond precision and a
     /// trailing `Z`. Matches `datetime_to_str(dt)` for the common timespec.
     public static func datetimeToString(_ date: Date) -> String {
-        Self.iso8601Formatter.string(from: date)
+        ISO8601Formatters.shared.format(date)
     }
 
     /// Parse an RFC 3339 / ISO 8601 string into a `Date`.
     public static func stringToDate(_ s: String) -> Date? {
-        if let d = Self.iso8601Formatter.date(from: s) { return d }
-        if let d = Self.iso8601FormatterNoFraction.date(from: s) { return d }
-        return nil
+        ISO8601Formatters.shared.parse(s)
     }
 
     public static func nowInUTC() -> Date { Date() }
 
     public static func nowToRFC3339() -> String { datetimeToString(nowInUTC()) }
+}
 
-    private static let iso8601Formatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+/// Lock-guarded `ISO8601DateFormatter` cache. `ISO8601DateFormatter` is
+/// documented thread-safe for parse/format, but the type itself isn't
+/// `Sendable`, so we explicitly serialize access to keep strict
+/// concurrency happy without ceremony at the call site.
+private final class ISO8601Formatters: @unchecked Sendable {
+    static let shared = ISO8601Formatters()
 
-    private static let iso8601FormatterNoFraction: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
-    }()
+    private let lock = NSLock()
+    private let withFraction: ISO8601DateFormatter
+    private let noFraction: ISO8601DateFormatter
 
+    private init() {
+        let f1 = ISO8601DateFormatter()
+        f1.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        self.withFraction = f1
+        let f2 = ISO8601DateFormatter()
+        f2.formatOptions = [.withInternetDateTime]
+        self.noFraction = f2
+    }
+
+    func format(_ date: Date) -> String {
+        lock.withLock { withFraction.string(from: date) }
+    }
+
+    func parse(_ s: String) -> Date? {
+        lock.withLock {
+            if let d = withFraction.date(from: s) { return d }
+            return noFraction.date(from: s)
+        }
+    }
+}
+
+extension HREFUtils {
     // MARK: - Misc
 
     /// True if the href has a file extension on its path. Mirrors

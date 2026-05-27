@@ -2,7 +2,7 @@ import Foundation
 
 /// A STAC Item — the granular GeoJSON Feature carrying metadata for one asset
 /// bundle. Mirrors `pystac.item.Item`.
-public final class Item: STACObject, AssetOwner, @unchecked Sendable {
+public final class Item: STACObject, AssetOwner {
 
     // MARK: - Fields
 

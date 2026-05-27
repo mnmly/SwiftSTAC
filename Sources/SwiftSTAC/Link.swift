@@ -6,7 +6,7 @@ import Foundation
 /// Mirrors `pystac.link.Link`. Lazily resolved: a Link constructed with a
 /// string target stays unresolved until a caller swaps the target for a
 /// real object (or until a future `StacIO` reader does it).
-public final class Link: @unchecked Sendable {
+public final class Link {
 
     /// Relation between owner and target (e.g. `child`, `item`, custom rel).
     public var rel: String

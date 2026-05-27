@@ -6,6 +6,25 @@ local-file I/O.
 
 ## Working invariants
 
+- **All I/O is `async throws`.** `StacIO.readText`, `StacIO.writeText`,
+  `Catalog.fromFile`, `STACObject.saveObject`, `Link.resolveSTACObject`,
+  `Catalog.walkResolving`, `Catalog.fullyResolve`, `Catalog.normalizeHrefs`,
+  `Catalog.save`, `Catalog.normalizeAndSave`. Never reintroduce a blocking
+  semaphore or sync HTTP path.
+- **STAC reference types are not `Sendable`.** `Item`, `Catalog`,
+  `Collection`, `Asset`, `Link`, `ItemCollection` are mutable classes —
+  callers must confine each instance to a single isolation domain. The
+  domain model is intentionally not `@unchecked Sendable`; if shared-state
+  use is needed, wrap in an actor.
+- **Process-wide mutable state lives behind locks or actors.** See
+  `StacIORegistry` (actor) and `STACVersion.OverrideStorage` (lock).
+- **The package compiles clean under `-strict-concurrency=complete`.**
+  CI should run `swift build -Xswiftc -strict-concurrency=complete` as
+  the canonical build invocation.
+
+---
+
+
 - **Don't break pystac wire compatibility.** JSON round-trip via
   `toDict` / `fromDict` (or `Collection.parse(_:)`) must produce dicts
   that pystac will load without error and vice-versa. Most fields are

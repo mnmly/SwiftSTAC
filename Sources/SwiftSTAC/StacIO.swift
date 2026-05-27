@@ -1,23 +1,25 @@
 import Foundation
 
 /// I/O abstraction for reading and writing STAC documents. Mirrors
-/// `pystac.stac_io.StacIO`.
+/// `pystac.stac_io.StacIO` with one important difference: all operations are
+/// `async throws`, so consumers integrate cleanly with structured
+/// concurrency and never block a thread on I/O.
 ///
-/// Implementations are responsible for resolving `file://`, http(s) and
-/// arbitrary URI schemes to raw text. JSON parsing and STAC-object dispatch
-/// are handled by the default protocol extension.
-public protocol StacIO {
+/// Implementations are responsible for resolving `file://`, `http(s)://`, or
+/// other URI schemes to raw text. JSON parsing and STAC-object dispatch are
+/// supplied by the default protocol extension.
+public protocol StacIO: Sendable {
     /// Read text from `source`.
-    func readText(_ source: String) throws -> String
+    func readText(_ source: String) async throws -> String
 
     /// Write `text` to `dest`.
-    func writeText(_ text: String, to dest: String) throws
+    func writeText(_ text: String, to dest: String) async throws
 }
 
 extension StacIO {
     /// Parse JSON from a URI.
-    public func readJSON(_ source: String) throws -> [String: JSONValue] {
-        let text = try readText(source)
+    public func readJSON(_ source: String) async throws -> [String: JSONValue] {
+        let text = try await readText(source)
         guard let data = text.data(using: .utf8) else {
             throw STACError.generic("Failed to encode JSON text as UTF-8")
         }
@@ -29,24 +31,24 @@ extension StacIO {
     }
 
     /// Encode and write a STAC dict to `dest`.
-    public func saveJSON(_ dict: [String: JSONValue], to dest: String) throws {
+    public func saveJSON(_ dict: [String: JSONValue], to dest: String) async throws {
         let enc = JSONEncoder()
         enc.outputFormatting = [.withoutEscapingSlashes, .prettyPrinted, .sortedKeys]
         let data = try enc.encode(JSONValue.object(dict))
         guard let s = String(data: data, encoding: .utf8) else {
             throw STACError.generic("Failed to decode encoded JSON as UTF-8")
         }
-        try writeText(s, to: dest)
+        try await writeText(s, to: dest)
     }
 
     /// Read a STAC document and return the matching Catalog / Collection / Item.
-    public func readSTACObject(_ source: String, root: Catalog? = nil) throws -> STACObject {
-        let dict = try readJSON(source)
+    public func readSTACObject(_ source: String, root: Catalog? = nil) async throws -> STACObject {
+        let dict = try await readJSON(source)
         return try stacObject(from: dict, href: source, root: root)
     }
 
     /// Build a STACObject from a parsed dict, with the appropriate concrete
-    /// type chosen by the `type` discriminator (and `stac_version` presence).
+    /// type chosen by the `type` discriminator.
     public func stacObject(
         from d: [String: JSONValue],
         href: String? = nil,
@@ -82,8 +84,8 @@ extension StacIO {
 // MARK: - Default implementation
 
 /// Default ``StacIO`` implementation. Supports local files (including
-/// `file://` URLs) and `http`/`https` (via synchronous URLSession). Other
-/// schemes throw ``STACError/generic(_:)``.
+/// `file://` URLs) and `http(s)://` URLs via `URLSession`. Other schemes
+/// throw ``STACError/generic(_:)``.
 public struct DefaultStacIO: StacIO, Sendable {
 
     public var headers: [String: String]
@@ -94,15 +96,15 @@ public struct DefaultStacIO: StacIO, Sendable {
         self.urlSession = urlSession
     }
 
-    public func readText(_ source: String) throws -> String {
+    public func readText(_ source: String) async throws -> String {
         if HREFUtils.isURL(source) {
-            return try fetchURL(source)
+            return try await fetchURL(source)
         }
         let path = filePath(source)
         return try String(contentsOf: URL(fileURLWithPath: path), encoding: .utf8)
     }
 
-    public func writeText(_ text: String, to dest: String) throws {
+    public func writeText(_ text: String, to dest: String) async throws {
         if HREFUtils.isURL(dest) {
             throw STACError.generic("DefaultStacIO does not support writing to URLs (\(dest)).")
         }
@@ -124,50 +126,49 @@ public struct DefaultStacIO: StacIO, Sendable {
         return href
     }
 
-    private func fetchURL(_ source: String) throws -> String {
+    private func fetchURL(_ source: String) async throws -> String {
         guard let url = URL(string: source) else {
             throw STACError.generic("Invalid URL: \(source)")
         }
         var req = URLRequest(url: url)
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
 
-        let semaphore = DispatchSemaphore(value: 0)
-        var resultData: Data?
-        var resultError: Error?
-        var resultStatus: Int = 0
-
-        let task = urlSession.dataTask(with: req) { data, response, error in
-            resultData = data
-            resultError = error
-            if let http = response as? HTTPURLResponse { resultStatus = http.statusCode }
-            semaphore.signal()
+        let (data, response) = try await urlSession.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw STACError.generic("HTTP \(http.statusCode) for \(source)")
         }
-        task.resume()
-        semaphore.wait()
-
-        if let error = resultError { throw error }
-        guard let resultData else { throw STACError.generic("No data returned for \(source)") }
-        if resultStatus >= 400 {
-            throw STACError.generic("HTTP \(resultStatus) for \(source)")
-        }
-        guard let text = String(data: resultData, encoding: .utf8) else {
+        guard let text = String(data: data, encoding: .utf8) else {
             throw STACError.generic("Failed to decode response as UTF-8 from \(source)")
         }
         return text
     }
 }
 
-// MARK: - StacIO.default registry
+// MARK: - Default-instance shorthand
 
 extension StacIO where Self == DefaultStacIO {
-    /// Convenience for `DefaultStacIO()`.
+    /// Shorthand for `DefaultStacIO()`. Use as a `StacIO`-typed argument
+    /// default: `func foo(io: some StacIO = .default)`.
     public static var `default`: DefaultStacIO { DefaultStacIO() }
 }
 
-/// Global default StacIO instance. Mirrors `pystac.StacIO.default()`.
-public enum StacIORegistry {
-    nonisolated(unsafe) private static var _default: StacIO = DefaultStacIO()
+/// Process-wide default ``StacIO``. Backed by an actor so concurrent reads
+/// and writes are safe. Mirrors `pystac.StacIO.default()`.
+public actor StacIORegistry {
+    private static let shared = StacIORegistry()
+    private var current: any StacIO = DefaultStacIO()
 
-    public static func currentDefault() -> StacIO { _default }
-    public static func setDefault(_ io: StacIO) { _default = io }
+    private init() {}
+
+    /// Resolve the currently registered default.
+    public static func currentDefault() async -> any StacIO {
+        await shared.current
+    }
+
+    /// Override the process-wide default.
+    public static func setDefault(_ io: any StacIO) async {
+        await shared.set(io)
+    }
+
+    private func set(_ io: any StacIO) { self.current = io }
 }

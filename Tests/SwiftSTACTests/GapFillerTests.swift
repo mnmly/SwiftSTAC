@@ -160,7 +160,7 @@ final class GapFillerTests: XCTestCase {
 
     // MARK: - normalize + save end-to-end
 
-    func test_normalizeAndSave_roundTripsTree() throws {
+    func test_normalizeAndSave_roundTripsTree() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -171,7 +171,7 @@ final class GapFillerTests: XCTestCase {
         try root.addChild(coll)
         try coll.addItem(item)
 
-        try root.normalizeAndSave(rootHref: dir.path)
+        try await root.normalizeAndSave(rootHref: dir.path)
 
         // Each file should exist where the strategy says it should
         XCTAssertTrue(FileManager.default.fileExists(atPath: dir.appendingPathComponent("catalog.json").path))
@@ -179,7 +179,7 @@ final class GapFillerTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: dir.appendingPathComponent("c1/i1/i1.json").path))
 
         // Read root back and confirm shape
-        let reloaded = try Catalog.fromFile(dir.appendingPathComponent("catalog.json").path)
+        let reloaded = try await Catalog.fromFile(dir.appendingPathComponent("catalog.json").path)
         XCTAssertEqual(reloaded.id, "root")
     }
 }

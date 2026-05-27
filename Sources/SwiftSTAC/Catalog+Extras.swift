@@ -26,8 +26,8 @@ extension Catalog {
     /// Force-resolve every link reachable from this catalog. After this, every
     /// child/item link points at an in-memory STAC object.
     /// Mirrors `pystac.Catalog.fully_resolve`.
-    public func fullyResolve(stacIO: StacIO = StacIORegistry.currentDefault()) throws {
-        _ = try walkResolving(stacIO: stacIO)
+    public func fullyResolve(stacIO: any StacIO = DefaultStacIO()) async throws {
+        _ = try await walkResolving(stacIO: stacIO)
     }
 
     /// Apply `mapper` to every resolved item in the catalog tree. Returns a
@@ -110,15 +110,15 @@ extension Catalog {
     /// `pystac.Catalog.normalize_hrefs`.
     public func normalizeHrefs(
         rootHref: String,
-        strategy: HrefLayoutStrategy = BestPracticesLayoutStrategy(),
-        stacIO: StacIO = StacIORegistry.currentDefault(),
+        strategy: any HrefLayoutStrategy = BestPracticesLayoutStrategy(),
+        stacIO: any StacIO = DefaultStacIO(),
         resolveAll: Bool = true
-    ) throws {
-        if resolveAll { try fullyResolve(stacIO: stacIO) }
+    ) async throws {
+        if resolveAll { try await fullyResolve(stacIO: stacIO) }
         try normalize(parentDir: rootHref, isRoot: true, strategy: strategy)
     }
 
-    private func normalize(parentDir: String, isRoot: Bool, strategy: HrefLayoutStrategy) throws {
+    private func normalize(parentDir: String, isRoot: Bool, strategy: any HrefLayoutStrategy) throws {
         let href = strategy.getHref(self, parentDir: parentDir, isRoot: isRoot)
         setSelfHref(href)
         let myDir = HREFUtils.parentDir(href)
@@ -137,22 +137,22 @@ extension Catalog {
     /// object's self HREF. Mirrors `pystac.Catalog.save`.
     public func save(
         catalogType: CatalogType? = nil,
-        stacIO: StacIO = StacIORegistry.currentDefault(),
+        stacIO: any StacIO = DefaultStacIO(),
         includeSelfLink: Bool? = nil
-    ) throws {
+    ) async throws {
         let actualType = catalogType ?? self.catalogType
         let includeSelf: Bool = {
             if let includeSelfLink { return includeSelfLink }
             return actualType == .absolutePublished || actualType == .relativePublished
         }()
-        try saveObject(includeSelfLink: includeSelf, stacIO: stacIO)
+        try await saveObject(includeSelfLink: includeSelf, stacIO: stacIO)
         for child in getChildren() {
             if let cat = child as? Catalog {
-                try cat.save(catalogType: actualType, stacIO: stacIO, includeSelfLink: includeSelf)
+                try await cat.save(catalogType: actualType, stacIO: stacIO, includeSelfLink: includeSelf)
             }
         }
         for item in getItems() {
-            try item.saveObject(includeSelfLink: includeSelf, stacIO: stacIO)
+            try await item.saveObject(includeSelfLink: includeSelf, stacIO: stacIO)
         }
     }
 
@@ -161,11 +161,11 @@ extension Catalog {
     public func normalizeAndSave(
         rootHref: String,
         catalogType: CatalogType? = nil,
-        strategy: HrefLayoutStrategy = BestPracticesLayoutStrategy(),
-        stacIO: StacIO = StacIORegistry.currentDefault()
-    ) throws {
-        try normalizeHrefs(rootHref: rootHref, strategy: strategy, stacIO: stacIO, resolveAll: false)
-        try save(catalogType: catalogType, stacIO: stacIO)
+        strategy: any HrefLayoutStrategy = BestPracticesLayoutStrategy(),
+        stacIO: any StacIO = DefaultStacIO()
+    ) async throws {
+        try await normalizeHrefs(rootHref: rootHref, strategy: strategy, stacIO: stacIO, resolveAll: false)
+        try await save(catalogType: catalogType, stacIO: stacIO)
     }
 }
 

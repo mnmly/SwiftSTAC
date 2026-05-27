@@ -7,11 +7,15 @@ native Swift on Apple platforms and Linux.
 ```swift
 import SwiftSTAC
 
-let catalog = try Catalog.fromFile("/path/to/catalog.json")
-for case let (cat, _, items) in try (catalog as! Catalog).walkResolving() {
+let catalog = try await Catalog.fromFile("/path/to/catalog.json")
+for case let (cat, _, items) in try await (catalog as! Catalog).walkResolving() {
     print(cat.id, "→", items.map(\.id))
 }
 ```
+
+All I/O is `async throws` — `URLSession.data(from:)` for HTTP, `Foundation`
+file APIs for disk, no thread-blocking primitives. The library passes
+`-strict-concurrency=complete` with zero warnings.
 
 ## What's included
 
@@ -52,12 +56,12 @@ let item = try Item(
 )
 try root.addChild(coll)
 try coll.addItem(item)
-try root.normalizeAndSave(rootHref: "/tmp/my-catalog")
+try await root.normalizeAndSave(rootHref: "/tmp/my-catalog")
 ```
 
 ```swift
 // Read fields through extensions
-let item = try Item.fromFile("/path/to/item.json")
+let item = try await Item.fromFile("/path/to/item.json")
 print(item.eo.cloudCover, item.proj.epsg, item.sar.polarizations as Any)
 
 // Write fields — the extension registers its schema URI automatically

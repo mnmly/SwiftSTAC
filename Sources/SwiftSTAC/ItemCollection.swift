@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Mirrors `pystac.item_collection.ItemCollection`. Not a STAC object — does
 /// not subclass ``STACObject``.
-public final class ItemCollection: @unchecked Sendable {
+public final class ItemCollection {
 
     public var items: [Item]
     public var extraFields: [String: JSONValue]

@@ -4,7 +4,7 @@ import Foundation
 /// providers, summaries, assets, item_assets).
 ///
 /// Mirrors `pystac.collection.Collection`.
-public final class Collection: Catalog, AssetOwner, @unchecked Sendable {
+public final class Collection: Catalog, AssetOwner {
 
     public var extent: Extent
     public var license: String

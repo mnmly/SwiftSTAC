@@ -10,7 +10,7 @@ import Foundation
 ///
 /// The base class implements link-graph helpers (`add_link`, `get_links`,
 /// `get_root`, `set_self_href`, …) so subclasses inherit them.
-open class STACObject: @unchecked Sendable {
+open class STACObject {
 
     /// Short human-readable form used by ``Catalog/describe(includeHrefs:indent:output:)``
     /// and debugging tools. Mirrors `pystac`'s `__repr__`. Not named
