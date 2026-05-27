@@ -334,14 +334,14 @@ private final class ISO8601Formatters: @unchecked Sendable {
     }
 
     func format(_ date: Date) -> String {
-        lock.withLock { withFraction.string(from: date) }
+        lock.lock(); defer { lock.unlock() }
+        return withFraction.string(from: date)
     }
 
     func parse(_ s: String) -> Date? {
-        lock.withLock {
-            if let d = withFraction.date(from: s) { return d }
-            return noFraction.date(from: s)
-        }
+        lock.lock(); defer { lock.unlock() }
+        if let d = withFraction.date(from: s) { return d }
+        return noFraction.date(from: s)
     }
 }
 

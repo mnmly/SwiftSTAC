@@ -52,9 +52,13 @@ extension JSONValue {
     public static func from(any value: Any) throws -> JSONValue {
         if value is NSNull { return .null }
         if let n = value as? NSNumber {
-            // Distinguish booleans from numerics via the underlying CFNumber type.
-            if CFGetTypeID(n) == CFBooleanGetTypeID() { return .bool(n.boolValue) }
+            // Distinguish booleans from numerics. `NSNumber`s wrapping bools
+            // have `objCType == "c"` (signed char) on both Apple Foundation
+            // and swift-corelibs-foundation. On Apple we'd reach for
+            // `CFGetTypeID(n) == CFBooleanGetTypeID()`, but CoreFoundation is
+            // Darwin-only.
             let t = String(cString: n.objCType)
+            if t == "c" || t == "B" { return .bool(n.boolValue) }
             if t == "f" || t == "d" { return .double(n.doubleValue) }
             return .int(n.int64Value)
         }

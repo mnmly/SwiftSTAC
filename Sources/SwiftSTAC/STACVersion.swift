@@ -36,10 +36,12 @@ private final class OverrideStorage: @unchecked Sendable {
     private var value: String?
 
     func get() -> String? {
-        lock.withLock { value }
+        lock.lock(); defer { lock.unlock() }
+        return value
     }
 
     func set(_ new: String?) {
-        lock.withLock { value = new }
+        lock.lock(); defer { lock.unlock() }
+        value = new
     }
 }

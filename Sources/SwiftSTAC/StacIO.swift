@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// I/O abstraction for reading and writing STAC documents. Mirrors
 /// `pystac.stac_io.StacIO` with one important difference: all operations are
