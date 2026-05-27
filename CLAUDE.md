@@ -19,12 +19,8 @@ local-file I/O.
 - **Process-wide mutable state lives behind locks or actors.** See
   `StacIORegistry` (actor) and `STACVersion.OverrideStorage` (lock).
 - **The package compiles clean under `-strict-concurrency=complete`.**
-  CI should run `swift build -Xswiftc -strict-concurrency=complete` as
-  the canonical build invocation.
-
----
-
-
+  Canonical build invocation:
+  `swift build -Xswiftc -strict-concurrency=complete`. CI fails on warnings.
 - **Don't break pystac wire compatibility.** JSON round-trip via
   `toDict` / `fromDict` (or `Collection.parse(_:)`) must produce dicts
   that pystac will load without error and vice-versa. Most fields are
@@ -41,6 +37,81 @@ local-file I/O.
 - **Tests use vendored pystac fixtures** under
   `Tests/SwiftSTACTests/Fixtures/`. If you need a new fixture, copy it
   from `../python/pystac/tests/data-files/` and add to that tree.
+
+## Cross-platform constraints
+
+- `URLSession` lives in `FoundationNetworking` on Linux. Anywhere a new
+  source file uses `URLSession`, guard the import:
+  ```swift
+  #if canImport(FoundationNetworking)
+  import FoundationNetworking
+  #endif
+  ```
+- `CoreFoundation` (`CFGetTypeID`, `CFBooleanGetTypeID`, etc.) is
+  Darwin-only. Don't reach for it. To distinguish a Bool-wrapped
+  `NSNumber` cross-platform, use `String(cString: n.objCType) == "c"`.
+- `NSLock.withLock` is Apple Foundation only. On Linux Swift 5.10 use
+  `lock(); defer { lock.unlock() }`.
+- Linux requires Swift 6.0+ because `URLSession.data(for:)` only landed
+  in `FoundationNetworking` with that release.
+
+## Upstream sync workflow
+
+The current upstream snapshot is pinned in two places that must stay in
+lockstep:
+
+- `Sources/SwiftSTAC/STACVersion.swift` →
+  `STACVersion.portedFromPystac` + `STACVersion.portedFromPystacCommit`
+- `README.md` → "Compatibility with PySTAC" table
+
+When syncing from a newer PySTAC release, do these steps in order:
+
+1. Read the upstream `CHANGELOG.md` between the currently-pinned commit
+   and the new target. Identify changes that touch SwiftSTAC's surface
+   (domain model, IO, extensions). Wire-format-only fields land in
+   `JSONValue` / `extraFields` automatically — skip those.
+2. Port the changes. Each new public symbol needs a `///` comment and,
+   if it belongs in the curated sidebar, an entry under the right
+   `## Topics` group in `Sources/SwiftSTAC/Documentation.docc/SwiftSTAC.md`.
+3. Port the corresponding pystac tests (under `../python/pystac/tests/`)
+   or extension tests (`../python/pystac/extensions/<ext>/tests/`).
+   Vendor any new fixtures into `Tests/SwiftSTACTests/Fixtures/`.
+4. Update `STACVersion.portedFromPystac` and
+   `STACVersion.portedFromPystacCommit` to the new upstream tag and
+   commit short hash.
+5. Add a `CHANGELOG.md` entry. Lead with
+   `Tracks **pystac X.Y.Z** (commit \`...\`).`
+6. Add a row to the README compatibility table.
+7. Verify:
+   ```bash
+   swift test -Xswiftc -strict-concurrency=complete
+   Scripts/build_docs.sh           # zero new warnings
+   ```
+8. Pick the SwiftSTAC SemVer bump based on **SwiftSTAC's** API delta, not
+   pystac's:
+   - Breaking change to SwiftSTAC's public API → minor bump while <1.0,
+     major bump once we hit 1.0.
+   - Additive only → patch or minor.
+   - Internal refactor + fixture refresh → patch.
+9. Cut the release (see "Releasing" below).
+
+## Releasing
+
+Tags are unprefixed (`0.2.1`, not `v0.2.1`). Each tagged commit gets a
+GitHub Release with notes derived from the CHANGELOG entry.
+
+```bash
+git tag -a 0.X.Y -m "0.X.Y — <one-line summary>"
+git push --follow-tags
+
+gh release create 0.X.Y --title "0.X.Y — <one-line summary>" --notes "$(...)"
+gh release edit 0.X.Y --latest        # if multiple releases were just made
+```
+
+CI must be green on `main` before the tag is pushed. The CI workflow at
+`.github/workflows/ci.yml` runs the strict-concurrency build + test on
+macOS 15 and Linux Swift 6.0; any new failure mode there should be
+fixed in `main` before tagging.
 
 ## Documentation
 
@@ -80,7 +151,8 @@ document parameter" warnings attributable to your changes.
 
 ## Out-of-scope (don't try to fill these without asking)
 
-- STAC API HTTP client (a separate package upstream).
+- STAC API HTTP client (a separate package — see the **SwiftSTACClient**
+  port that should live alongside this repo).
 - JSON Schema validation.
 - Pre-1.0 STAC document migration.
 - `ResolvedObjectCache` for cross-link object identity.
