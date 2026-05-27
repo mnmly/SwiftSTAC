@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["[0-9]+.[0-9]+.[0-9]+*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macOS / strict concurrency
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Build (strict concurrency)
+        run: swift build -Xswiftc -strict-concurrency=complete
+
+      - name: Test (strict concurrency)
+        run: swift test -Xswiftc -strict-concurrency=complete
+
+  linux:
+    name: Linux / Swift ${{ matrix.swift }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        swift: ["5.10", "6.0"]
+    container:
+      image: swift:${{ matrix.swift }}-jammy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Build (strict concurrency)
+        run: swift build -Xswiftc -strict-concurrency=complete
+
+      - name: Test (strict concurrency)
+        run: swift test -Xswiftc -strict-concurrency=complete
