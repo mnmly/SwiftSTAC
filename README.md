@@ -95,6 +95,23 @@ domain model and local-file IO.
 - Swift 6.0+ on Linux (the async HTTP path needs `URLSession.data(for:)`,
   which only landed in FoundationNetworking with Swift 6.0).
 
+## Compatibility with PySTAC
+
+Each SwiftSTAC release pins the upstream PySTAC version it tracks. The
+mapping is also available at runtime:
+
+```swift
+STACVersion.portedFromPystac        // "1.15.0-rc.0"
+STACVersion.portedFromPystacCommit  // "6184a7ca"
+```
+
+| SwiftSTAC | PySTAC          | Upstream commit |
+| --------- | --------------- | --------------- |
+| 0.1.x     | 1.15.0-rc.0     | `6184a7ca`      |
+| 0.2.x     | 1.15.0-rc.0     | `6184a7ca`      |
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for per-release notes.
+
 ## Install
 
 Add to your `Package.swift`:

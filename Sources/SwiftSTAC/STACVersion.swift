@@ -7,8 +7,20 @@ import Foundation
 /// `setSTACVersion` / `getSTACVersion` can be called from any isolation
 /// domain (or no isolation at all).
 public enum STACVersion {
+    /// STAC spec version SwiftSTAC writes as `stac_version`.
     public static let defaultSTACVersion = "1.1.0"
+
+    /// STAC API spec version SwiftSTAC claims.
     public static let defaultSTACAPIVersion = "1.0.0"
+
+    /// Version of [PySTAC](https://github.com/stac-utils/pystac) this port
+    /// tracks. Bump in lockstep with the upstream tag/commit pinned in
+    /// `portedFromPystacCommit`. Read with `STACVersion.portedFromPystac`
+    /// to discover compatibility at runtime.
+    public static let portedFromPystac = "1.15.0-rc.0"
+
+    /// Upstream PySTAC git commit this port was taken from.
+    public static let portedFromPystacCommit = "6184a7ca"
 
     /// Override environment variable name, matching pystac.
     public static let overrideVersionEnvVar = "PYSTAC_STAC_VERSION_OVERRIDE"
