@@ -91,8 +91,9 @@ domain model and local-file IO.
 
 ## Requirements
 
-- Swift 5.10+
-- macOS 13+, iOS 16+, tvOS 16+, watchOS 9+, or Linux
+- Swift 5.10+ on Apple platforms (macOS 13+, iOS 16+, tvOS 16+, watchOS 9+).
+- Swift 6.0+ on Linux (the async HTTP path needs `URLSession.data(for:)`,
+  which only landed in FoundationNetworking with Swift 6.0).
 
 ## Install
 

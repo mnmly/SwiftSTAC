@@ -36,7 +36,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        swift: ["5.10", "6.0"]
+        # Swift 5.10 on Linux lacks URLSession.data(for:), which the async
+        # StacIO requires. Apple platforms have it since iOS 15 / macOS 12.
+        swift: ["6.0"]
     container:
       image: swift:${{ matrix.swift }}-jammy
     steps:
