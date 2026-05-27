@@ -1,0 +1,7 @@
+SwiftSTAC
+Copyright 2026 mnmly
+
+This product includes software ported from PySTAC
+(https://github.com/stac-utils/pystac), which is licensed under the
+Apache License, Version 2.0. PySTAC is copyright (c) 2019-2024 the PySTAC
+authors.
