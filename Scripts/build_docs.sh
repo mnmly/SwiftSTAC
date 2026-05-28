@@ -121,6 +121,22 @@ if [[ "${EMIT_LLMS_TXT:-0}" == "1" ]]; then
     echo "Wrote $LLMS ($(wc -l < "$LLMS" | tr -d ' ') lines)."
 fi
 
+# Write a top-level redirect index.html so that the Pages root URL lands on
+# the first target's documentation instead of returning 404. The DocC build
+# emits everything under $OUTPUT_DIR/$TARGET/; without this, the root of
+# $HOSTING_BASE_PATH/ has no index.
+first_target="${TARGETS%% *}"
+first_slug="$(echo "$first_target" | tr '[:upper:]' '[:lower:]')"
+redirect_url="/${HOSTING_BASE_PATH}/${first_target}/documentation/${first_slug}/"
+cat > "$OUTPUT_DIR/index.html" <<HTML
+<!doctype html>
+<meta charset="utf-8">
+<title>${HOSTING_BASE_PATH}</title>
+<meta http-equiv="refresh" content="0; url=${redirect_url}">
+<link rel="canonical" href="${redirect_url}">
+<p>Redirecting to <a href="${redirect_url}">${redirect_url}</a>.</p>
+HTML
+
 echo
 echo "Docs written to $OUTPUT_DIR/. Open $OUTPUT_DIR/<Target>/index.html"
 echo "or push to gh-pages."
